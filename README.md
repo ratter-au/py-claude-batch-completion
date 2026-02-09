@@ -1,0 +1,40 @@
+# `ratter-au/py-claude-batch-completion`
+
+Ultra-minimal plain-text command-line interface for Anthropic's large language
+model "Claude", utilising batch mode for lower inference costs.
+
+The input and output are formatted to match the text in the model's context
+window as closely as possible. The conversation history is read from standard
+input. The user is expected to maintain it in a text file, adding their own
+message at the end, before using this script to request a response from Claude.
+
+Responses are written to standard output. If more than one response is
+requested, they will be separated by a "file separator" control character
+(U+001C).
+
+Complete messages (`stop_reason = "end_turn"`) will end with the "Human" turn
+marker. Incomplete messages will have the `stop_reason` value appended after an
+"end of text" character (U+0003). Requests which could not be completed will be
+indicated with a "bell" character (U+0007) followed by the error message.
+
+Tools are not supported by this script.
+
+## Exit status
+
+The script's exit status will be the bitwise `OR` of the following values for
+each message:
+
+- 0: success (`end_turn` or `stop_sequence`)
+- 1: error
+- 2: truncation (`max_tokens`, `pause_turn`, *etc.*)
+- 4: refusal
+
+## To do
+
+- Command-line options
+- Tests!!!
+
+## License
+
+The contents of this repository are released under
+[the Creative Commons Attribution 4.0 International (CC-BY-4.0) license](./LICENSE.txt).
