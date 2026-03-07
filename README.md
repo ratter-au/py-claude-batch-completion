@@ -28,10 +28,22 @@ character (U+001C).
 Complete messages (`stop_reason = "end_turn"`) will end with the "Human"
 turn marker. Incomplete messages will have the `stop_reason` value
 appended after an "end of text" character (U+0003). Requests which could
-not be completed will be indicated with a "bell" character (U+0007)
+not be completed will be indicated with an "end of text" character
 followed by the error message.
 
-Tools are not supported by this script.
+Tool use and structured output are not supported by this script.
+
+## Command-line options
+
+- `-m`, `--model`: model ID
+- `-t`, `--temperature`: temperature
+- `-n`, `--number`: number of completions to request
+- `-i`, `--interval`: polling interval in seconds
+- `-l`, `--length`: maximum number of output tokens per request
+- `-c`, `--caching`: prompt caching interval (`5m`/`1h`)
+- `--no-caching`: disable prompt caching
+- `--thinking`: thinking (token budget or the keyword `adaptive`)
+- `--effort`: effort (`low`/`medium`/`high`/`max`)
 
 ## Exit status
 
@@ -45,9 +57,7 @@ values for all messages:
 
 ## To do
 
-- Command-line options
 - Tests!!!
-- Better handling of `thinking` blocks
 
 ## License
 
