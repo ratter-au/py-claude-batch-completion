@@ -57,6 +57,9 @@ values for all messages:
 
 ## To do
 
+- Effort
+- Thinking
+- Caching
 - Tests!!!
 
 ## License

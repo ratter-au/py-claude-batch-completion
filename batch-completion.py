@@ -61,8 +61,10 @@ from asyncio import (
     sleep as asyncio_sleep,
 )
 from logging import (
+    getLogger as get_logger,
     basicConfig as logging_config,
     DEBUG as LOGGING_LEVEL_DEBUG,
+    INFO as LOGGING_LEVEL_INFO,
 )
 
 from anthropic import (
@@ -153,15 +155,16 @@ EXIT_TRUNCATED: Final[int] = 2
 EXIT_REFUSAL: Final[int] = 4
 
 ########################################################################
+# LOGGING
+
+logger: Final[object] = get_logger(__name__)
+
+########################################################################
 # FUNCTIONS
 
 def write_stdout(text: str) -> None:
     """Write `text` to standard output, followed by a newline, and flush the stream."""
     print(text, flush=True)
-
-def write_stderr(text: str) -> None:
-    """Write `text` to standard error, followed by a newline, and flush the stream."""
-    print(text, file=stderr, flush=True)
 
 # def split_trailing_whitespace(text: str) -> tuple[str, str]:
 #     """Strip trailing whitespace from `text` (via `rstrip()`) and return `(rstripped_text, whitespace)`."""
@@ -180,17 +183,17 @@ def response_to_status_and_string(response: MessageBatchIndividualResponse) -> t
         if stop_reason == MESSAGE_STOP_REASON_END_TURN or stop_reason == MESSAGE_STOP_REASON_STOP_SEQUENCE:
             return (EXIT_SUCCESS, text)
         elif stop_reason == MESSAGE_STOP_REASON_REFUSAL:
-            write_stderr(f"Response {response_id}: refused by classifier")
+            logger.info(f"Response {response_id}: refused by classifier")
             return (EXIT_REFUSAL, text)
-        write_stderr(f"Response {response_id}: truncated: {stop_reason}")
+        logger.info(f"Response {response_id}: truncated: {stop_reason}")
         return (EXIT_TRUNCATED, text + DELIMITER_STOP_REASON_OR_ERROR + stop_reason)
     elif result_type == MESSAGE_BATCH_RESULT_TYPE_ERRORED:
         error: Final[AnthropicErrorObject] = result.error.error
         error_message: Final[str] = error.type + ": " + error.message
-        write_stderr(f"Response {response_id}: error: {error_message}")
+        logger.error(f"Response {response_id}: {error_message}")
         return (EXIT_ERROR, DELIMITER_STOP_REASON_OR_ERROR + error_message)
     else:
-        write_stderr(f"Response {response_id}: unhandled result type: {result_type}")
+        logger.error(f"Response {response_id}: unhandled result type: {result_type}")
         return (EXIT_ERROR, DELIMITER_ERROR + "unhandled result type: " + result_type)
 
 async def batch_completion(
@@ -214,15 +217,15 @@ async def batch_completion(
             raise ValueError("‘thinking’ must be either a positive integer or the string “adaptive”")
         if thinking == "adaptive":
             # TODO: implement adaptive thinking
-            write_stderr("WARNING: adaptive thinking is not yet implemented")
+            logger.warning("adaptive thinking is not yet implemented")
             thinking = None
     if effort is not None:
         # TODO: implement effort
-        write_stderr("WARNING: effort is not yet implemented")
+        logger.warning("effort is not yet implemented")
         effort = None
     if caching is not None:
-        # TODO: Implement caching
-        write_stderr("WARNING: caching is not yet implemented")
+        # TODO: implement caching
+        logger.warning("caching is not yet implemented")
         caching = None
 
     # TODO: more bounds/type checking
@@ -284,9 +287,7 @@ argument_parser.add_argument("--effort", help="Effort", type=str, dest="effort",
 
 async def main(argv: Iterable[str]) -> int:
 
-    write_stderr("argv: " + repr(argv[1:]))
     args = argument_parser.parse_args(argv[1:])
-    write_stderr("command-line options: " + repr(args))
 
     system_prompt: str = ""
     messages: Final[list[MessageParam]] = []
@@ -295,23 +296,23 @@ async def main(argv: Iterable[str]) -> int:
     input_messages: list[MessageParam] = []
     last_message_role: Optional[MessageRole] = None
 
-    write_stderr("Reading conversation history from standard input...")
+    logger.debug("Reading conversation history from standard input...")
     input_text = stdin.read()
 
-    write_stderr("Parsing input...")
+    logger.debug("Parsing input...")
     [input_prefix, input_messages] = message_split(input_text)
-    write_stderr(f"Parsed {len(input_messages)} messages.")
+    logger.info(f"Parsed {len(input_messages)} messages.")
     system_prompt += input_prefix
     messages += input_messages
     if not messages: raise ValueError("At least one message is required")
 
     last_message_role = messages[-1]["role"]
     while last_message_role == MESSAGE_ROLE_USER:
-        write_stderr("Conversation ends with a ‘Human’ message; reading further input...")
+        logger.info("Conversation ends with a ‘Human’ message; reading further input...")
         input_text = stdin.read()
-        write_stderr("Parsing input...")
+        logger.debug("Parsing input...")
         [input_prefix, input_messages] = split_messages(input_text, last_message_role)
-        write_stderr(f"Parsed {len(input_messages)} messages.")
+        logger.info(f"Parsed {len(input_messages)} messages.")
         if input_prefix:
             # TODO: handle other content block types
             messages[-1]["content"][-1]["text"] += input_prefix
@@ -320,12 +321,11 @@ async def main(argv: Iterable[str]) -> int:
 
     # Delete the last message if it's empty.
     if not "\n\n".join(map(content_to_str, messages[-1]["content"])).strip():
-        write_stderr("Discarding empty ‘Assistant’ message at end of conversation.")
+        logger.debug("Discarding empty ‘Assistant’ message at end of conversation.")
         del messages[-1]
 
     # DEBUGGING
-    write_stderr(f"system_prompt = {system_prompt!r}\nmessages = {messages!r}")
-    # return EXIT_SUCCESS
+    logger.debug(f"system_prompt = {system_prompt!r}\nmessages = {messages!r}")
 
     client = AsyncAnthropic()
 
@@ -346,12 +346,12 @@ async def main(argv: Iterable[str]) -> int:
     ):
         [status, response_string] = response_to_status_and_string(response)
         exit_status |= status
-        if response_count: print(DELIMITER_COMPLETION, end="")
+        if response_count: print(DELIMITER_COMPLETION, end="", flush=True)
         write_stdout(response_string)
         response_count += 1
-    write_stderr("Done.")
+    logger.info("Done.")
     return exit_status
 
 if __name__ == "__main__":
-    logging_config(level=LOGGING_LEVEL_DEBUG)
+    logging_config(level=LOGGING_LEVEL_INFO)
     exit(asyncio_run(main(argv)))
